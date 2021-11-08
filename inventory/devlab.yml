@@ -1,0 +1,176 @@
+---
+## YAML based inventory, see:
+## https://docs.ansible.com/ansible/latest/plugins/inventory/yaml.html
+#
+## Define the KVM host, it is referenced in the play by the "kvmhost" group
+## This example is localhost, but you can set whatever vars you need to here
+## The KVM host is where the networks are defined, under either "absent" or "present"
+## This allows us to clean up and remove networks you no-longer need
+kvmhost:
+  hosts:
+    # Put your KVM host connection and settings here
+    localhost:
+      ansible_connection: local
+      ansible_python_interpreter: /usr/bin/python3
+  vars:
+    # Networks are a list, you can add more than one
+    # You can create and remove NAT networks on kvmhost (creating bridges not supported)
+    # The 'default' network is the standard one shipped with libvirt
+    # By default we don't remove any networks (empty absent list)
+    virt_infra_host_networks:
+      absent:
+        - name: "default-ansible"
+      present:
+        - name: "k8s-nat"
+          ip_address: "172.16.8.1"
+          subnet: "255.255.255.0"
+          dhcp_start: "172.16.8.2"
+          dhcp_end: "172.16.8.254"
+          bridge_dev: virbrnat
+          bridge_stp: on
+          bridge_delay: 0
+        - name: "k8s-routed"
+          ip_address: "192.168.8.1"
+          subnet: "255.255.255.0"
+          dhcp_start: "192.168.8.2"
+          dhcp_end: "192.168.8.254"
+          type: route
+          bridge_dev: virbr0
+          bridge_stp: on
+          bridge_delay: 0
+
+nats:
+  hosts:
+    nats-1:
+      # VM metadata
+      virt_infra_distro_image: CentOS-8-GenericCloud-8.4.2105-20210603.0.x86_64.qcow2
+      virt_infra_distro_image_url: https://cloud.centos.org/centos/8/x86_64/images/CentOS-8-GenericCloud-8.4.2105-20210603.0.x86_64.qcow2
+      virt_infra_distro_image_checksum_url: https://cloud.centos.org/centos/8/x86_64/images/CHECKSUM
+      ansible_python_interpreter: /usr/libexec/platform-python
+      virt_infra_ram: "768"
+      virt_infra_cpus: "1"
+      virt_infra_state: running
+      virt_infra_variant: centos7.0
+      # users
+      virt_infra_user: mrhajs
+      virt_infra_password: "Passw0rd.2021"
+      virt_infra_ssh_pwauth: false
+      #virt_infra_root_password: "Passw0rd.2021"
+      #virt_infra_ssh_keys:
+      #  - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDPXEDR93EK1xOYgH037EhM+BPoNTm33kR7LRFGxujcL2PztQsvaVDMy5woyBFetVa2/zOKtfxlTwlcWHaw5bw5xEjF5IrF58iI1tG5r8wy0smlD8Pg1zLNnrQ3sbgEs9l++WzicyRiUsLoUqVt/hOXLlBmxFrI6xegU3ais2uupR/EmsVDYPmHMc9FenzgS6dvpIkBUor7acOkFtyGrJGg2Zh/gmiGvwSTsfsSkZ/nHE6TwisKqToyWvhaUnlpdHoFTe2z+amh2fkUcUJXW0IuI6cqo4DczXZ6eN3VnqoVhDqp6RkLO4eu9/ncWqb19NAtc6M7EacHd2ZEe+imzusF
+      #  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKJL6PoO3rmXYIiRlEUWImPp4RiAJbCtKqeqhkjqaoZd
+      # configure networkig through cloud-init
+      virt_infra_network_config: true
+      virt_infra_networks:
+        - name: "k8s-nat"
+          model: "virtio"
+          device: eth0
+          addresses:
+            - 172.16.8.254/24
+          gateway4: 172.16.8.1
+          nameservers:
+            addresses: [8.8.8.8]
+        - name: "k8s-routed"
+          model: "virtio"
+          device: eth1
+          addresses:
+            - 192.168.8.254/24
+          #gateway4: 172.16.8.1
+          #nameservers:
+          #  search: [foo.local, bar.local]
+          #  addresses: [8.8.8.8]
+          #routes:
+          #  - to: 10.0.0.0/24
+          #    via: 192.18.0.254
+          #    metric: 100
+  vars:
+    iptables_rules: "nats"
+
+k8s_nodes:
+  children:
+    k8s_masters:
+      hosts:
+        m-1-k8s:
+          # VM metadata
+          # configure networkig through cloud-init
+          virt_infra_networks:
+            - name: "k8s-routed"
+              model: "virtio"
+              device: eth0
+              addresses:
+                - 192.168.8.11/24
+              gateway4: 192.168.8.254
+              nameservers:
+                addresses: [192.168.8.1]
+        m-2-k8s:
+          # VM metadata
+          # configure networkig through cloud-init
+          virt_infra_networks:
+            - name: "k8s-routed"
+              model: "virtio"
+              device: eth0
+              addresses:
+                - 192.168.8.12/24
+              gateway4: 192.168.8.254
+              nameservers:
+                addresses: [192.168.8.1]
+      vars:
+        # VM metadata
+        virt_infra_distro_image: CentOS-8-GenericCloud-8.4.2105-20210603.0.x86_64.qcow2
+        virt_infra_distro_image_url: https://cloud.centos.org/centos/8/x86_64/images/CentOS-8-GenericCloud-8.4.2105-20210603.0.x86_64.qcow2
+        virt_infra_distro_image_checksum_url: https://cloud.centos.org/centos/8/x86_64/images/CHECKSUM
+        ansible_python_interpreter: /usr/libexec/platform-python
+        virt_infra_ram: "2048"
+        virt_infra_cpus: "1"
+        virt_infra_state: running
+        virt_infra_variant: centos7.0
+        # users
+        virt_infra_user: mrhajs
+        virt_infra_password: "Passw0rd.2021"
+        virt_infra_ssh_pwauth: false
+        # configure networkig through cloud-init
+        virt_infra_network_config: true
+        iptables_rules: "k8s-master"
+    k8s_workers:
+      hosts:
+        w-1-k8s:
+          # VM metadata
+          # configure networkig through cloud-init
+          virt_infra_networks:
+            - name: "k8s-routed"
+              model: "virtio"
+              device: eth0
+              addresses:
+                - 192.168.8.21/24
+              gateway4: 192.168.8.254
+              nameservers:
+                addresses: [192.168.8.1]
+        w-2-k8s:
+          # VM metadata
+          # configure networkig through cloud-init
+          virt_infra_networks:
+            - name: "k8s-routed"
+              model: "virtio"
+              device: eth0
+              addresses:
+                - 192.168.8.22/24
+              gateway4: 192.168.8.254
+              nameservers:
+                addresses: [192.168.8.1]
+      vars:
+        # VM metadata
+        virt_infra_distro_image: CentOS-8-GenericCloud-8.4.2105-20210603.0.x86_64.qcow2
+        virt_infra_distro_image_url: https://cloud.centos.org/centos/8/x86_64/images/CentOS-8-GenericCloud-8.4.2105-20210603.0.x86_64.qcow2
+        virt_infra_distro_image_checksum_url: https://cloud.centos.org/centos/8/x86_64/images/CHECKSUM
+        ansible_python_interpreter: /usr/libexec/platform-python
+        virt_infra_ram: "2048"
+        virt_infra_cpus: "1"
+        virt_infra_state: running
+        virt_infra_variant: centos7.0
+        # users
+        virt_infra_user: mrhajs
+        virt_infra_password: "Passw0rd.2021"
+        virt_infra_ssh_pwauth: false
+        # configure networkig through cloud-init
+        virt_infra_network_config: true
+        iptables_rules: "k8s-worker"

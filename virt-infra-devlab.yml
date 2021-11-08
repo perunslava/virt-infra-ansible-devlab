@@ -1,0 +1,31 @@
+---
+# Master playbook for setting up KVM guests on a KVM host using an inventory
+# Requires a KVM host and qemu-img, virsh, virt-customize and virt-sysprep.
+#
+# Limit your inventory to the group of VMs you want to set up, like this:
+# ansible-playbook \
+# --ask-become-pass \
+# --limit kvmhost,guests \
+# --inventory ./inventory/hosts.yml \
+# ./virt-infra.yml
+#
+- name: prepare infrastructure( configure KVM host and install VMs )
+  hosts: all
+  gather_facts: no
+  roles:
+    - ansible-role-virt-infra
+
+# Now you can use the inventory to do anything else you want...
+
+- name: apply common configuration for nats VMs
+  hosts: nats
+  gather_facts: no
+  roles:
+    - ansible-role-common-base
+
+- name: apply common configuration for k8s VMs
+  hosts: k8s_nodes
+  gather_facts: no
+  roles:
+    - ansible-role-common-base
+    - ansible-role-k8s-cluster
