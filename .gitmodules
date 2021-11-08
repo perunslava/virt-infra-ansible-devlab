@@ -1,6 +1,7 @@
 [submodule "roles/ansible-role-virt-infra"]
 	path = roles/ansible-role-virt-infra
-	url = https://github.com/csmart/ansible-role-virt-infra.git
+    url = https://github.com/csmart/ansible-role-virt-infra.git
+
 [submodule "roles/ansible-role-k8s-cluster"]
 	path = roles/ansible-role-k8s-cluster
 	url = https://github.com/perunslava/ansible-role-k8s-cluster.git
